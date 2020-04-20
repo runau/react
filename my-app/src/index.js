@@ -2,166 +2,291 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 
-  class StartButton extends React.Component {
+const INTERVAL_TIME = 90
+const COMMENT_LAG_TIME = 10
+const MOVE_LAG_TIME = 15
+const TAP_LAG_TIME = 5
+const BOX_TIME = 420
+const TOTAL_TIME = BOX_TIME + COMMENT_LAG_TIME * 4
 
-    render() {
-      Alarm(this.props.value)
-      return (
-        <div>
-          <p>test{this.props.value}</p>
-          <button onClick={() => this.props.onClick()}>
-            up
-          </button>
-          <button onClick={() => this.setProps({value: this.props.value+1})}>
-            up_bk
-          </button>
-          <button onClick={() => alert('start')}>
-            start
-          </button>
-        </div>
-      );
-    }
-  }
+class StartButton extends React.Component {
 
-  class Timer extends React.Component {
-    constructor(props) {
-      super(props);
-      this.state = {
-        value: 0,
-      };
-    }
-    handleClick(i) {
-      // const value = this.state.value.slice();
-      // value = this.state.value + 1;
-      this.setState({value: this.state.value + 1});
-    }
-    render()  {
-      return (
-        <StartButton
-          value={this.state.value}
-          onClick={() => this.handleClick(this.state.value)}
-        />
-      );
-    }
-  }
-
-  function Square(props) {
+  render() {
     return (
-      <button className="square" onClick={props.onClick}>
-        {props.value}
-      </button>
+      <div>
+        <h2>boxオーブンのカウント表示  {convert(this.props.timer_count)}</h2>
+        <p>残りbox数  {this.props.box_count}個</p>
+        <button onClick={() => this.props.setting('box_count', 1)}>
+          1個
+        </button>
+        <button onClick={() => this.props.setting('box_count', 2)}>
+          2個
+        </button>
+        <p>boxオーブンまでのトータル時間  {convert(this.props.total_count)}</p>
+        <p>次のコメントまで {convert(this.props.interval_count)}</p>
+        <p>この設定での時給コイン{Math.floor(3600 / TOTAL_TIME * 2)}～{Math.floor(3600 / TOTAL_TIME * 10)}コイン(期待値{Math.floor(3600 / TOTAL_TIME * 6)}コイン)</p>
+        <button onClick={() => this.props.onClick(0)}>
+          reset
+        </button>
+        <button onClick={() => this.props.onClick(-1)}>
+          stop
+        </button>
+        <h2>調整用</h2>
+        <p>boxのタイマーと表示がずれてしまった時は、コメント後、下記ボタンを押して調整してください。</p>
+        <button onClick={() => this.props.adjustment(330)}>
+          5:30
+        </button>
+        <button onClick={() => this.props.adjustment(240)}>
+          4:00
+        </button>
+        <button onClick={() => this.props.adjustment(150)}>
+          2:30
+        </button>
+        <button onClick={() => this.props.adjustment(60)}>
+          1:00
+        </button>
+        <br />
+        <p>微調整は、下記ボタンで対応ください。</p>
+        <button onClick={() => this.props.onClick(-5)}>
+          +5sec
+        </button>
+        <button onClick={() => this.props.onClick(-15)}>
+          +15sec
+        </button>
+        <button onClick={() => this.props.onClick(5)}>
+          -5sec
+        </button>
+        <button onClick={() => this.props.onClick(15)}>
+          -15sec
+        </button>
+        <h2>設定</h2>
+        <p>コメント入力にかかる時間  {COMMENT_LAG_TIME}秒</p>
+        <p>配信の移動にかかる時間  {MOVE_LAG_TIME}秒</p>
+        <p>ボックスのタップにかかる時間  {TAP_LAG_TIME}秒</p>
+      </div>
     );
   }
-  
-  class Board extends React.Component {
-    constructor(props) {
-      super(props);
-      this.state = {
-        squares: Array(9).fill(null),
-        xIsNext: true,
-      };
-    }
+}
+/* <h2>設定</h2>
+<p>コメント入力にかかる時間  {COMMENT_LAG_TIME}秒</p>
+<button onClick={() => this.props.lag_setting('comment',5)}>
+  5sec
+</button>
+<button onClick={() => this.props.lag_setting('comment',10)}>
+  10sec
+</button>
+<button onClick={() => this.props.lag_setting('comment',15)}>
+  15sec
+</button>
+<p>配信の移動にかかる時間  {MOVE_LAG_TIME}秒</p>
+<button onClick={() => this.props.lag_setting('move',10)}>
+  5sec
+</button>
+<button onClick={() => this.props.lag_setting('move',15)}>
+  10sec
+</button>
+<button onClick={() => this.props.lag_setting('move',20)}>
+  15sec
+</button>
+<p>ボックスのタップにかかる時間  {TAP_LAG_TIME}秒</p>
+<button onClick={() => this.props.lag_setting('tap',5)}>
+  5sec
+</button>
+<button onClick={() => this.props.lag_setting('tap',10)}>
+  10sec
+</button>
+<button onClick={() => this.props.lag_setting('tap',15)}>
+  15sec
+</button> */
 
-    handleClick(i) {
-      const squares = this.state.squares.slice();
-      squares[i] = this.state.xIsNext ? 'X' : 'O';
+class Timer extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = this.initParam();
+  }
+  componentDidMount() {
+    this.intervalId = setInterval(() => {
+      this.countDown(1);
+    }, 1000);
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.intervalId);
+  }
+
+  initParam() {
+    return {
+      total_count: TOTAL_TIME,
+      interval_count: INTERVAL_TIME,
+      lag_count: 0,
+      timer_count: BOX_TIME,
+      lag: false,
+      box_count: 2
+    }
+  }
+
+  countDown(count) {
+
+    if (this.state.lag) {
       this.setState({
-        squares: squares,
-        xIsNext: !this.state.xIsNext,
+        total_count: this.state.total_count - count
+        , lag_count: this.state.lag_count - count
+      });
+    } else {
+      this.setState({
+        total_count: this.state.total_count - count
+        , interval_count: this.state.interval_count - count
+        , timer_count: this.state.timer_count - count
       });
     }
-
-    renderSquare(i) {
-      return (
-        <Square
-          value={this.state.squares[i]}
-          onClick={() => this.handleClick(i)}
-        />
-      );
+    if (count === 1) {
+      this.alartCheck(true);
+    } else {
+      this.alartCheck(false);
     }
-    render() {
-      const winner = calculateWinner(this.state.squares);
-      let status;
-      if (winner) {
-        status = 'Winner: ' + winner;
+  }
+  alartCheck(alarm) {
+    if (this.state.lag) {
+      if (lag_alarm(this.state.lag_count)) {
+        this.setState({
+          interval_count: INTERVAL_TIME
+          , lag: false
+        });
+      }
+    } else {
+      if (interval_alarm(this.state.interval_count, alarm)) {
+        this.setState({
+          lag: true
+          , lag_count: COMMENT_LAG_TIME
+        });
+      }
+    }
+    if (total_alarm(this.state.total_count, alarm)) {
+      var box = this.state.box_count;
+      this.setState(this.initParam());
+      if (box === 2) {
+        this.setState({
+          lag: true
+          , lag_count: TAP_LAG_TIME
+          , total_count: this.state.total_count + TAP_LAG_TIME
+          , box_count: 1
+        });
       } else {
-        status = 'Next player: ' + (this.state.xIsNext ? 'X' : 'O');
-      }
-      return (
-        <div>
-          <div className="status">{status}</div>
-          <div className="board-row">
-            {this.renderSquare(0)}
-            {this.renderSquare(1)}
-            {this.renderSquare(2)}
-          </div>
-          <div className="board-row">
-            {this.renderSquare(3)}
-            {this.renderSquare(4)}
-            {this.renderSquare(5)}
-          </div>
-          <div className="board-row">
-            {this.renderSquare(6)}
-            {this.renderSquare(7)}
-            {this.renderSquare(8)}
-          </div>
-        </div>
-      );
-    }
-  }
-
-    class Game extends React.Component {
-    render() {
-      return (
-        <div className="game">
-          <div className="game-board">
-            <Board />
-          </div>
-          <div className="game-info">
-            <div>{/* status */}</div>
-            <ol>{/* TODO */}</ol>
-          </div>
-          <Timer />
-        </div>
-      );
-    }
-  }
-
-  function calculateWinner(squares) {
-    const lines = [
-      [0, 1, 2],
-      [3, 4, 5],
-      [6, 7, 8],
-      [0, 3, 6],
-      [1, 4, 7],
-      [2, 5, 8],
-      [0, 4, 8],
-      [2, 4, 6],
-    ];
-    for (let i = 0; i < lines.length; i++) {
-      const [a, b, c] = lines[i];
-      if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-        return squares[a];
+        this.setState({
+          lag: true
+          , lag_count: MOVE_LAG_TIME
+          , total_count: this.state.total_count + MOVE_LAG_TIME
+          , box_count: 2
+        });
       }
     }
-    return null;
   }
-
-  function Alarm(count) {
-    
-    if (count === 10) {
-      alert('start')
+  adjustment(count) {
+    this.setState({
+      total_count: count + Math.floor(count / INTERVAL_TIME) * COMMENT_LAG_TIME,
+      interval_count: INTERVAL_TIME,
+      lag_count: 0,
+      timer_count: count,
+      lag: false
+    });
+  }
+  setting(item, value) {
+    if (item === 'box_count') {
+      this.setState({
+        box_count: value
+      });
     }
-    return null;
   }
-  // ========================================
-  
-  ReactDOM.render(
-    <Game />,
-    document.getElementById('root')
-  );
-  // ReactDOM.render(
-  //   <h1>Hello, world!</h1>,
-  //   document.getElementById('root')
-  // );
-  
+  handleClick(count) {
+    if (count === 0) {
+      this.setState(this.initParam());
+    } else if (count === 1) {
+      this.setState(this.initParam());
+    } else {
+      while (count !== 0) {
+        var tmpCount
+        if (this.state.lag) {
+          if (this.state.lag_count >= count) {
+            tmpCount = count
+          } else {
+            tmpCount = this.state.lag_count
+          }
+        } else {
+          if (this.state.interval_count >= count) {
+            tmpCount = count
+          } else {
+            tmpCount = this.state.interval_count
+          }
+        }
+        this.countDown(tmpCount)
+        count = count - tmpCount
+      }
+    }
+  }
+  render() {
+    return (
+      <StartButton
+        total_count={this.state.total_count}
+        box_count={this.state.box_count}
+        interval_count={this.state.interval_count}
+        timer_count={this.state.timer_count}
+        lag_count={this.state.lag_count}
+        lag={this.state.lag}
+        onClick={(count) => this.handleClick(count)}
+        adjustment={(count) => this.adjustment(count)}
+        setting={(item, value) => this.setting(item, value)}
+      />
+    );
+  }
+}
+
+class Game extends React.Component {
+  render() {
+    return (
+      <div className="game">
+        <Timer />
+      </div>
+    );
+  }
+}
+
+function interval_alarm(count, alarm) {
+
+  if (count <= 0) {
+    if (alarm) {
+      new Audio("./interval.mp3").play();
+    }
+    return true;
+  }
+  return false;
+}
+
+function total_alarm(count, alarm) {
+
+  if (count <= 0) {
+    if (alarm) {
+      new Audio("./box_open.mp3").play();
+    }
+    return true;
+  }
+  return false;
+}
+
+function lag_alarm(count) {
+
+  if (count <= 0) {
+    return true;
+  }
+  return false;
+}
+
+function convert(count) {
+  return Math.floor(count / 60) + '分' + count % 60 + '秒'
+}
+// ========================================
+
+
+ReactDOM.render(
+  <Game />,
+  document.getElementById('root')
+);
